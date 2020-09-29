@@ -1,49 +1,35 @@
 'use strict';
-const faker = require('faker');
-require('dotenv').config();
-// const inquirer = require('inquirer');
+  
+/* eslint-disable no-use-before-define */
+require('dotenv').config('.env');
 
-const net = require('net');
-const client = new net.Socket();
-const host =  process.env.HOST || 'localhost';
+const storeName = process.env.STORE_NAME;
+
+const io = require('socket.io-client');
+
+const Order = require('./models/Order');
+
+const host = process.env.HOST || 'localhost';
 const port = process.env.PORT || 4000;
 
+const socket = io(`http://${host}:${port}/caps`);
 
+const { deliveredHandler } = require('./socketHandler');
 
-function Event(eventType){
-  this.event = eventType;
-  this.time =  faker.date.recent();
-  this.payload = new Payload;
-}
+socket.emit('join', storeName);
 
-function Payload(){
-  this.store = process.env.StoreName;
-  this.orderID = faker.random.uuid();
-  this.firstName = faker.name.firstName();
-  this.address = faker.address.city();
-}
-
-
-function handleOrder(){
-  let item = new Event('pickup');
-  let sentPickUp = JSON.stringify(item);
-  client.write(sentPickUp);
-
-}
-
-setInterval(handleOrder,5000);
-
-client.connect(port, host, ()=> {
-  console.log(' Connected to Server! ..');
+socket.on('connect', () => {
+  console.log('Vednor is connected to Server! ..');
 });
 
-client.on('data', function(data) {
-  let jsonData = JSON.parse(data);
-  if (jsonData.event === 'delivered'){
-    setTimeout(()=> {console.log(`Thank delivered ${jsonData.payload.orderID}`);});
-  }
+socket.on('delivered', (payLoad) => {
+  deliveredHandler(payLoad);
+});
+socket.on('disconnect', () => {
+  console.log('Vednor is disconnected');
 });
 
-
-
-
+setInterval(() => {
+  const order = new Order();
+  socket.emit('pickup', order);
+}, 5000);
