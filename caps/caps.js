@@ -1,58 +1,45 @@
 'use strict';
 
-// const events = require('../events');
+const http = require('http');
 
+const server = http.createServer();
 
+const io = require('socket.io')(server);
 
-const net = require('net');
-
-const server = net.createServer();
-// run the server 
+const caps = io.of('/caps');
 
 const port = process.env.PORT || 4000;
 
-server.listen(port, ()=> console.log(`server is running on ${port}`));
+server.listen(port, () => console.log(`server is running on ${port}`));
 
+const {
+  joinHandler, pickupHandler, inTransitHandler, deliveredHandler,
+} = require('./socketHandler');
+//caps namespace on connection 
+caps.on('connection', (socket) => {
+  console.log('user is online!!!', socket.id);
 
-let socketPool = {};
-
-server.on('connection', (socket)=> {
-  
-
-  const id = `Socket-${Math.random()}`;
-
-   
-  socketPool[id] = socket;
-
-  socket.on('data', buffer => {
-    let msg = JSON.parse(buffer.toString());
-    if(msg.event && msg.payload){
- 
-     
-      console.log( msg); 
-      broadcast(msg);
-
-      
-    }else{
-      console.log('bad data');
-    }
+  socket.on('join', (payload) => {
+    joinHandler(socket, payload);
   });
 
-    
-
-  server.on('error', (e)=> {
-    console.log('ERROR !!!!!!! ', e);
+  socket.on('pickup', (payload) => {
+    pickupHandler(socket, payload);
   });
 
-  server.on('close', ()=> {
-    delete socketPool[id];
+  socket.on('in-transit', (payload) => {
+    inTransitHandler(socket, payload);
+  });
+
+  socket.on('delivered', (payload) => {
+    deliveredHandler(socket, payload);
+  });
+
+  socket.on('error', (e) => {
+    console.log('ERROR !!!!!!! ', e.message);
+  });
+
+  socket.on('close', (err) => {
+    console.log(socket.id, ' closed ', err.message);
   });
 });
-
-function broadcast(msg) {
-  let payload = JSON.stringify(msg);
-  for (let id in socketPool) {
-    console.log(' ---------LOOPING-----***** ', id );
-    socketPool[id].write(payload);
-  }
-}
